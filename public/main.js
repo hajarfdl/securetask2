@@ -3,7 +3,6 @@
 // ═══════════════════════════════════════════
 
 const API = 'https://securetask-liart.vercel.app/api';
-
 // ─── AUTH ───
 function isLoggedIn() {
     return !!localStorage.getItem('securetask_logged');

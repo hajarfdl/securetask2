@@ -1,30 +1,53 @@
-const mysql = require('mysql2/promise');
+const Database = require('better-sqlite3');
+const path = require('path');
 
-const dbConfig = {
-    host: process.env.MYSQLHOST,
-    user: process.env.MYSQLUSER,
-    password: process.env.MYSQLPASSWORD,
-    database: process.env.MYSQLDATABASE,
-    port: process.env.MYSQLPORT || 3306
-};
+const db = new Database(path.join('/tmp', 'securetask.db'));
 
-module.exports = async (req, res) => {
+// Créer les tables
+db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nom TEXT,
+        email TEXT UNIQUE,
+        mot_de_passe TEXT,
+        role TEXT
+    );
+    CREATE TABLE IF NOT EXISTS taches (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        titre TEXT,
+        description TEXT,
+        priorite TEXT,
+        echeance TEXT,
+        assigne_a TEXT,
+        statut TEXT,
+        labels TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+`);
+
+// Ajouter utilisateurs par défaut
+const count = db.prepare('SELECT COUNT(*) as c FROM users').get();
+if (count.c === 0) {
+    db.prepare("INSERT INTO users (nom, email, mot_de_passe, role) VALUES (?,?,?,?)").run('Karim Alaoui', 'test@securetask.ma', 'password123', 'Lead Securite');
+    db.prepare("INSERT INTO users (nom, email, mot_de_passe, role) VALUES (?,?,?,?)").run('Ahmad', 'ahmad@securetask.ma', 'password123', 'Ingenieur SSI');
+    db.prepare("INSERT INTO users (nom, email, mot_de_passe, role) VALUES (?,?,?,?)").run('Sara', 'sara@securetask.ma', 'password123', 'Ingenieur SSI');
+    db.prepare("INSERT INTO users (nom, email, mot_de_passe, role) VALUES (?,?,?,?)").run('Laila', 'laila@securetask.ma', 'password123', 'Observateur');
+}
+
+module.exports = (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
     if (req.method === 'OPTIONS') return res.status(200).end();
 
-    const db = await mysql.createConnection(dbConfig);
     const url = req.url;
     const method = req.method;
 
     try {
         // LOGIN
-        if (url === '/api/login' && method === 'POST') {
+        if (url.includes('/login') && method === 'POST') {
             const { email, password } = req.body;
-            const [rows] = await db.execute('SELECT * FROM users WHERE email = ?', [email]);
-            const user = rows[0];
+            const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
             if (user && user.mot_de_passe === password) {
                 return res.json({ success: true, user: { id: user.id, nom: user.nom, email: user.email, role: user.role } });
             }
@@ -32,47 +55,43 @@ module.exports = async (req, res) => {
         }
 
         // GET TACHES
-        if (url === '/api/taches' && method === 'GET') {
-            const [rows] = await db.execute('SELECT * FROM taches ORDER BY created_at DESC');
-            rows.forEach(t => { if (t.echeance) t.echeance = t.echeance.toString().split('T')[0]; });
-            return res.json(rows);
+        if (url.includes('/taches') && method === 'GET' && !url.match(/\/taches\/\d+/)) {
+            const taches = db.prepare('SELECT * FROM taches ORDER BY created_at DESC').all();
+            return res.json(taches);
         }
 
         // CREATE TACHE
-        if (url === '/api/taches' && method === 'POST') {
+        if (url.includes('/taches') && method === 'POST') {
             const { titre, description, priorite, echeance, assigneA, statut, labels } = req.body;
-            await db.execute(
-                'INSERT INTO taches (titre, description, priorite, echeance, assigne_a, statut, labels) VALUES (?,?,?,?,?,?,?)',
-                [titre, description || '', priorite || 'Moyenne', echeance, assigneA || 'Non assigne', statut || 'A faire', (labels || []).join(', ')]
+            db.prepare('INSERT INTO taches (titre, description, priorite, echeance, assigne_a, statut, labels) VALUES (?,?,?,?,?,?,?)').run(
+                titre, description || '', priorite || 'Moyenne', echeance || '', assigneA || 'Non assigne', statut || 'A faire', (labels || []).join(', ')
             );
             return res.json({ success: true });
         }
 
         // UPDATE TACHE
-        if (url.startsWith('/api/taches/') && method === 'PUT') {
-            const id = url.split('/')[3];
-            await db.execute('UPDATE taches SET statut = ? WHERE id = ?', [req.body.statut, id]);
+        if (url.match(/\/taches\/\d+/) && method === 'PUT') {
+            const id = url.split('/').pop();
+            db.prepare('UPDATE taches SET statut = ? WHERE id = ?').run(req.body.statut, id);
             return res.json({ success: true });
         }
 
         // DELETE TACHE
-        if (url.startsWith('/api/taches/') && method === 'DELETE') {
-            const id = url.split('/')[3];
-            await db.execute('DELETE FROM taches WHERE id = ?', [id]);
+        if (url.match(/\/taches\/\d+/) && method === 'DELETE') {
+            const id = url.split('/').pop();
+            db.prepare('DELETE FROM taches WHERE id = ?').run(id);
             return res.json({ success: true });
         }
 
         // GET USERS
-        if (url === '/api/users' && method === 'GET') {
-            const [rows] = await db.execute('SELECT id, nom, email, role FROM users');
-            return res.json(rows);
+        if (url.includes('/users') && method === 'GET') {
+            const users = db.prepare('SELECT id, nom, email, role FROM users').all();
+            return res.json(users);
         }
 
-        return res.status(404).json({ error: 'Route non trouvée' });
+        return res.status(404).json({ error: 'Route non trouvee' });
 
     } catch (error) {
         return res.status(500).json({ error: error.message });
-    } finally {
-        await db.end();
     }
 };
