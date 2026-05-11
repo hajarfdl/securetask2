@@ -2,7 +2,7 @@
 //  SecureTask — main.js (version avec API)
 // ═══════════════════════════════════════════
 
-const API = 'https://web-production-6d09f.up.railway.app/api';
+const API = 'https://securetask-liart.vercel.app/api';
 
 // ─── AUTH ───
 function isLoggedIn() {
