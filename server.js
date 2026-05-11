@@ -1,67 +1,62 @@
 const express = require('express');
-const mysql = require('mysql2');
+const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const app = express();
 
 app.use(express.json());
 app.use(express.static(__dirname));
 
-// ── Connexion MySQL ──
-const db = mysql.createConnection({
-    host: process.env.MYSQLHOST || 'localhost',
-    user: process.env.MYSQLUSER || 'root',
-    password: process.env.MYSQLPASSWORD || '',
-    database: process.env.MYSQLDATABASE || 'securetask',
-    port: process.env.MYSQLPORT || 3306
-});
-
-db.connect(err => {
+// ── Connexion SQLite (Fichier local) ──
+const dbPath = path.join(__dirname, 'database.sqlite');
+const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
-        console.error('Erreur MySQL:', err);
-        return;
+        console.error('Erreur SQLite:', err.message);
+    } else {
+        console.log('✅ SQLite connecté (Fichier: database.sqlite) !');
+        initDB();
     }
-    console.log('✅ MySQL connecté !');
-    initDB();
 });
 
-// ── Créer les tables ──
+// ── Créer les tables (Syntaxe SQLite) ──
 function initDB() {
-    db.query(`
-        CREATE TABLE IF NOT EXISTS users (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            nom VARCHAR(100),
-            email VARCHAR(100) UNIQUE,
-            mot_de_passe VARCHAR(255),
-            role VARCHAR(50),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    `);
+    db.serialize(() => {
+        db.run(`
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nom TEXT,
+                email TEXT UNIQUE,
+                mot_de_passe TEXT,
+                role TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
 
-    db.query(`
-        CREATE TABLE IF NOT EXISTS taches (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            titre VARCHAR(200),
-            description TEXT,
-            priorite VARCHAR(50),
-            echeance DATE,
-            assigne_a VARCHAR(100),
-            statut VARCHAR(50),
-            labels VARCHAR(255),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    `);
+        db.run(`
+            CREATE TABLE IF NOT EXISTS taches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                titre TEXT,
+                description TEXT,
+                priorite TEXT,
+                echeance TEXT,
+                assigne_a TEXT,
+                statut TEXT,
+                labels TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
 
-    db.query(`SELECT COUNT(*) as count FROM users`, (err, results) => {
-        if (!err && results[0].count === 0) {
-            db.query(`
-                INSERT INTO users (nom, email, mot_de_passe, role) VALUES
-                ('Karim Alaoui', 'test@securetask.ma', 'password123', 'Lead Securite'),
-                ('Ahmad', 'ahmad@securetask.ma', 'password123', 'Ingenieur SSI'),
-                ('Sara', 'sara@securetask.ma', 'password123', 'Ingenieur SSI'),
-                ('Laila', 'laila@securetask.ma', 'password123', 'Observateur')
-            `);
-            console.log('✅ Utilisateurs créés !');
-        }
+        // Insertion des utilisateurs par défaut
+        db.get(`SELECT COUNT(*) as count FROM users`, (err, row) => {
+            if (!err && row.count === 0) {
+                const stmt = db.prepare(`INSERT INTO users (nom, email, mot_de_passe, role) VALUES (?, ?, ?, ?)`);
+                stmt.run('Karim Alaoui', 'test@securetask.ma', 'password123', 'Lead Securite');
+                stmt.run('Ahmad', 'ahmad@securetask.ma', 'password123', 'Ingenieur SSI');
+                stmt.run('Sara', 'sara@securetask.ma', 'password123', 'Ingenieur SSI');
+                stmt.run('Laila', 'laila@securetask.ma', 'password123', 'Observateur');
+                stmt.finalize();
+                console.log('✅ Utilisateurs créés !');
+            }
+        });
     });
 }
 
@@ -73,9 +68,8 @@ app.get('/', (req, res) => {
 // ── LOGIN ──
 app.post('/api/login', (req, res) => {
     const { email, password } = req.body;
-    db.query('SELECT * FROM users WHERE email = ?', [email], (err, results) => {
+    db.get('SELECT * FROM users WHERE email = ?', [email], (err, user) => {
         if (err) return res.status(500).json({ success: false, message: err.message });
-        const user = results[0];
         if (user && user.mot_de_passe === password) {
             return res.json({
                 success: true,
@@ -88,36 +82,32 @@ app.post('/api/login', (req, res) => {
 
 // ── TÂCHES ──
 app.get('/api/taches', (req, res) => {
-    db.query('SELECT * FROM taches ORDER BY created_at DESC', (err, results) => {
+    db.all('SELECT * FROM taches ORDER BY created_at DESC', [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
-        results.forEach(t => {
-            if (t.echeance) t.echeance = t.echeance.toISOString().split('T')[0];
-        });
-        res.json(results);
+        res.json(rows);
     });
 });
 
 app.post('/api/taches', (req, res) => {
     const { titre, description, priorite, echeance, assigneA, statut, labels } = req.body;
-    db.query(
-        'INSERT INTO taches (titre, description, priorite, echeance, assigne_a, statut, labels) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [titre, description || '', priorite || 'Moyenne', echeance, assigneA || 'Non assigne', statut || 'A faire', (labels || []).join(', ')],
-        (err, result) => {
-            if (err) return res.status(500).json({ success: false, error: err.message });
-            res.json({ success: true, id: result.insertId });
-        }
-    );
+    const sql = 'INSERT INTO taches (titre, description, priorite, echeance, assigne_a, statut, labels) VALUES (?, ?, ?, ?, ?, ?, ?)';
+    const params = [titre, description || '', priorite || 'Moyenne', echeance, assigneA || 'Non assigne', statut || 'A faire', (labels || []).join(', ')];
+    
+    db.run(sql, params, function(err) {
+        if (err) return res.status(500).json({ success: false, error: err.message });
+        res.json({ success: true, id: this.lastID });
+    });
 });
 
 app.put('/api/taches/:id', (req, res) => {
-    db.query('UPDATE taches SET statut = ? WHERE id = ?', [req.body.statut, req.params.id], err => {
+    db.run('UPDATE taches SET statut = ? WHERE id = ?', [req.body.statut, req.params.id], function(err) {
         if (err) return res.status(500).json({ success: false, error: err.message });
         res.json({ success: true });
     });
 });
 
 app.delete('/api/taches/:id', (req, res) => {
-    db.query('DELETE FROM taches WHERE id = ?', [req.params.id], err => {
+    db.run('DELETE FROM taches WHERE id = ?', [req.params.id], function(err) {
         if (err) return res.status(500).json({ success: false, error: err.message });
         res.json({ success: true });
     });
@@ -125,9 +115,9 @@ app.delete('/api/taches/:id', (req, res) => {
 
 // ── USERS ──
 app.get('/api/users', (req, res) => {
-    db.query('SELECT id, nom, email, role FROM users', (err, results) => {
+    db.all('SELECT id, nom, email, role FROM users', [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
-        res.json(results);
+        res.json(rows);
     });
 });
 
