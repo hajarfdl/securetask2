@@ -1,5 +1,5 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const sqlite3 = require('sqlite3').verbose(); // Utilisation de sqlite3 au lieu de mysql2
 const path = require('path');
 const app = express();
 
@@ -7,12 +7,13 @@ app.use(express.json());
 app.use(express.static(__dirname));
 
 // ── Connexion SQLite (Fichier local) ──
-const dbPath = path.join(__dirname, 'database.sqlite');
+// Remplace ton ancienne ligne par celle-ci :
+const dbPath = path.join('/tmp', 'database.sqlite');
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
         console.error('Erreur SQLite:', err.message);
     } else {
-        console.log('✅ SQLite connecté (Fichier: database.sqlite) !');
+        console.log('✅ SQLite connecté !');
         initDB();
     }
 });
@@ -45,7 +46,7 @@ function initDB() {
             )
         `);
 
-        // Insertion des utilisateurs par défaut
+        // Insertion des utilisateurs par défaut si la table est vide
         db.get(`SELECT COUNT(*) as count FROM users`, (err, row) => {
             if (!err && row.count === 0) {
                 const stmt = db.prepare(`INSERT INTO users (nom, email, mot_de_passe, role) VALUES (?, ?, ?, ?)`);
@@ -54,18 +55,18 @@ function initDB() {
                 stmt.run('Sara', 'sara@securetask.ma', 'password123', 'Ingenieur SSI');
                 stmt.run('Laila', 'laila@securetask.ma', 'password123', 'Observateur');
                 stmt.finalize();
-                console.log('✅ Utilisateurs créés !');
+                console.log('✅ Utilisateurs initiaux créés !');
             }
         });
     });
 }
 
-// ── Pages HTML ──
+// ── Routes API (Adaptées pour SQLite) ──
+
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'connexion.html'));
 });
 
-// ── LOGIN ──
 app.post('/api/login', (req, res) => {
     const { email, password } = req.body;
     db.get('SELECT * FROM users WHERE email = ?', [email], (err, user) => {
@@ -80,7 +81,6 @@ app.post('/api/login', (req, res) => {
     });
 });
 
-// ── TÂCHES ──
 app.get('/api/taches', (req, res) => {
     db.all('SELECT * FROM taches ORDER BY created_at DESC', [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -113,7 +113,6 @@ app.delete('/api/taches/:id', (req, res) => {
     });
 });
 
-// ── USERS ──
 app.get('/api/users', (req, res) => {
     db.all('SELECT id, nom, email, role FROM users', [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -121,7 +120,6 @@ app.get('/api/users', (req, res) => {
     });
 });
 
-// ── DÉMARRAGE ──
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => {
     console.log(`✅ SecureTask démarré sur le port ${PORT}`);
