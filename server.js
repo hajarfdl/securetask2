@@ -4,7 +4,6 @@ const path = require('path');
 const app = express();
 
 app.use(express.json());
-// Remplace app.use(express.static(__dirname)); par :
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ── Connexion SQLite (Fichier local) ──
