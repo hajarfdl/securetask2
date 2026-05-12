@@ -3,7 +3,6 @@ const path = require('path');
 
 const db = new Database(path.join('/tmp', 'securetask.db'));
 
-// Créer les tables
 db.exec(`
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,7 +24,6 @@ db.exec(`
     );
 `);
 
-// Ajouter utilisateurs par défaut
 const count = db.prepare('SELECT COUNT(*) as c FROM users').get();
 if (count.c === 0) {
     db.prepare("INSERT INTO users (nom, email, mot_de_passe, role) VALUES (?,?,?,?)").run('Karim Alaoui', 'test@securetask.ma', 'password123', 'Lead Securite');
@@ -44,7 +42,6 @@ module.exports = (req, res) => {
     const method = req.method;
 
     try {
-        // LOGIN
         if (url.includes('/login') && method === 'POST') {
             const { email, password } = req.body;
             const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
@@ -54,13 +51,11 @@ module.exports = (req, res) => {
             return res.status(401).json({ success: false, message: 'Email ou mot de passe incorrect' });
         }
 
-        // GET TACHES
         if (url.includes('/taches') && method === 'GET' && !url.match(/\/taches\/\d+/)) {
             const taches = db.prepare('SELECT * FROM taches ORDER BY created_at DESC').all();
             return res.json(taches);
         }
 
-        // CREATE TACHE
         if (url.includes('/taches') && method === 'POST') {
             const { titre, description, priorite, echeance, assigneA, statut, labels } = req.body;
             db.prepare('INSERT INTO taches (titre, description, priorite, echeance, assigne_a, statut, labels) VALUES (?,?,?,?,?,?,?)').run(
@@ -69,21 +64,18 @@ module.exports = (req, res) => {
             return res.json({ success: true });
         }
 
-        // UPDATE TACHE
         if (url.match(/\/taches\/\d+/) && method === 'PUT') {
             const id = url.split('/').pop();
             db.prepare('UPDATE taches SET statut = ? WHERE id = ?').run(req.body.statut, id);
             return res.json({ success: true });
         }
 
-        // DELETE TACHE
         if (url.match(/\/taches\/\d+/) && method === 'DELETE') {
             const id = url.split('/').pop();
             db.prepare('DELETE FROM taches WHERE id = ?').run(id);
             return res.json({ success: true });
         }
 
-        // GET USERS
         if (url.includes('/users') && method === 'GET') {
             const users = db.prepare('SELECT id, nom, email, role FROM users').all();
             return res.json(users);
