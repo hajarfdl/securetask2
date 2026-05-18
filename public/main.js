@@ -63,58 +63,75 @@ function initLogin() {
 }
 
 // ─── REGISTER ───
+
 function initRegister() {
-  const form = document.getElementById('register-form');
-  if (!form) return;
+    const form = document.getElementById('register-form');
+    if (!form) return;
 
-  form.addEventListener('submit', async e => {
-    e.preventDefault();
-    const nom      = document.getElementById('nom').value.trim();
-    const email    = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value;
-    const confirm  = document.getElementById('confirm-password').value;
-    const errEl    = document.getElementById('register-error');
-    const sucEl    = document.getElementById('register-success');
+    form.addEventListener('submit', async e => {
+        e.preventDefault();
 
-    errEl.style.display = 'none';
-    sucEl.style.display = 'none';
+        const nom      = document.getElementById('nom').value.trim();
+        const email    = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        const confirm  = document.getElementById('confirm-password').value;
 
-    // Vérification côté client
-    if (password !== confirm) {
-      errEl.style.display = 'block';
-      errEl.textContent = 'Les mots de passe ne correspondent pas.';
-      return;
-    }
-    if (password.length < 6) {
-      errEl.style.display = 'block';
-      errEl.textContent = 'Le mot de passe doit contenir au moins 6 caractères.';
-      return;
-    }
+        const errEl = document.getElementById('register-error');
+        const sucEl = document.getElementById('register-success');
 
-    try {
-      const res = await fetch(`${API}/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nom, email, password })
-      });
+        errEl.style.display = 'none';
+        sucEl.style.display = 'none';
 
-      const data = await res.json();
+        // Vérification mot de passe
+        if (password !== confirm) {
+            errEl.style.display = 'block';
+            errEl.textContent = 'Les mots de passe ne correspondent pas.';
+            return;
+        }
 
-      if (data.success) {
-        sucEl.style.display = 'block';
-        sucEl.textContent = 'Compte créé avec succès ! Redirection...';
-        setTimeout(() => window.location.href = 'connexion.html', 2000);
-      } else {
-        errEl.style.display = 'block';
-        errEl.textContent = data.message || 'Erreur lors de la création du compte.';
-      }
-    } catch (err) {
-      errEl.style.display = 'block';
-      errEl.textContent = 'Erreur de connexion au serveur.';
-    }
-  });
+        // Vérification longueur
+        if (password.length < 6) {
+            errEl.style.display = 'block';
+            errEl.textContent = 'Le mot de passe doit contenir au moins 6 caractères.';
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API}/register`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    nom,
+                    email,
+                    password
+                })
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                sucEl.style.display = 'block';
+                sucEl.textContent = 'Compte créé avec succès !';
+
+                setTimeout(() => {
+                    window.location.href = 'connexion.html';
+                }, 1500);
+
+            } else {
+                errEl.style.display = 'block';
+                errEl.textContent = data.message || 'Erreur lors de la création.';
+            }
+
+        } catch (err) {
+            console.error(err);
+
+            errEl.style.display = 'block';
+            errEl.textContent = 'Erreur serveur.';
+        }
+    });
 }
-
 // ─── TÂCHES ───
 async function loadTasks() {
     try {
