@@ -81,6 +81,31 @@ app.post('/api/login', (req, res) => {
     });
 });
 
+app.post('/api/register', (req, res) => {
+    const { nom, email, password } = req.body;
+
+    if (!nom || !email || !password) {
+        return res.status(400).json({ success: false, message: 'Tous les champs sont obligatoires.' });
+    }
+    if (password.length < 6) {
+        return res.status(400).json({ success: false, message: 'Mot de passe trop court (6 caractères min).' });
+    }
+
+    db.get('SELECT id FROM users WHERE email = ?', [email], (err, existing) => {
+        if (existing) {
+            return res.status(409).json({ success: false, message: 'Cet email est déjà utilisé.' });
+        }
+        db.run(
+            'INSERT INTO users (nom, email, mot_de_passe, role) VALUES (?, ?, ?, ?)',
+            [nom, email, password, 'Utilisateur'],
+            function(err) {
+                if (err) return res.status(500).json({ success: false, message: err.message });
+                res.json({ success: true, message: 'Compte créé avec succès.' });
+            }
+        );
+    });
+});
+
 app.get('/api/taches', (req, res) => {
     db.all('SELECT * FROM taches ORDER BY created_at DESC', [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });

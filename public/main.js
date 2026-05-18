@@ -62,6 +62,59 @@ function initLogin() {
     });
 }
 
+// ─── REGISTER ───
+function initRegister() {
+  const form = document.getElementById('register-form');
+  if (!form) return;
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const nom      = document.getElementById('nom').value.trim();
+    const email    = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const confirm  = document.getElementById('confirm-password').value;
+    const errEl    = document.getElementById('register-error');
+    const sucEl    = document.getElementById('register-success');
+
+    errEl.style.display = 'none';
+    sucEl.style.display = 'none';
+
+    // Vérification côté client
+    if (password !== confirm) {
+      errEl.style.display = 'block';
+      errEl.textContent = 'Les mots de passe ne correspondent pas.';
+      return;
+    }
+    if (password.length < 6) {
+      errEl.style.display = 'block';
+      errEl.textContent = 'Le mot de passe doit contenir au moins 6 caractères.';
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API}/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nom, email, password })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        sucEl.style.display = 'block';
+        sucEl.textContent = 'Compte créé avec succès ! Redirection...';
+        setTimeout(() => window.location.href = 'connexion.html', 2000);
+      } else {
+        errEl.style.display = 'block';
+        errEl.textContent = data.message || 'Erreur lors de la création du compte.';
+      }
+    } catch (err) {
+      errEl.style.display = 'block';
+      errEl.textContent = 'Erreur de connexion au serveur.';
+    }
+  });
+}
+
 // ─── TÂCHES ───
 async function loadTasks() {
     try {
@@ -579,7 +632,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const page = document.body.dataset.page;
 
-    if (page === 'login') { initLogin(); return; }
+    if (page === 'login')    { initLogin();    return; }
+    if (page === 'register') { initRegister(); return; } 
 
     requireAuth();
     initSidebar();

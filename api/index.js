@@ -75,6 +75,51 @@ module.exports = (req, res) => {
             db.prepare('DELETE FROM taches WHERE id = ?').run(id);
             return res.json({ success: true });
         }
+        
+        if (url.includes('/register') && method === 'POST') {
+    const { nom, email, password } = req.body;
+
+    // Vérifications
+    if (!nom || !email || !password) {
+        return res.status(400).json({ success: false, message: 'Tous les champs sont obligatoires.' });
+    }
+    if (password.length < 6) {
+        return res.status(400).json({ success: false, message: 'Mot de passe trop court (6 caractères min).' });
+    }
+
+    // Vérifier si l'email existe déjà
+    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+    if (existing) {
+        return res.status(409).json({ success: false, message: 'Cet email est déjà utilisé.' });
+    }
+
+    // Insérer le nouvel utilisateur
+    db.prepare('INSERT INTO users (nom, email, mot_de_passe, role) VALUES (?,?,?,?)')
+      .run(nom, email, password, 'Utilisateur');
+
+    return res.json({ success: true, message: 'Compte créé avec succès.' });
+}
+
+        if (url.includes('/register') && method === 'POST') {
+            const { nom, email, password } = req.body;
+
+            if (!nom || !email || !password) {
+                return res.status(400).json({ success: false, message: 'Tous les champs sont obligatoires.' });
+            }
+            if (password.length < 6) {
+                return res.status(400).json({ success: false, message: 'Mot de passe trop court (6 caractères min).' });
+            }
+
+            const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+            if (existing) {
+                return res.status(409).json({ success: false, message: 'Cet email est déjà utilisé.' });
+            }
+
+            db.prepare('INSERT INTO users (nom, email, mot_de_passe, role) VALUES (?,?,?,?)')
+              .run(nom, email, password, 'Utilisateur');
+
+            return res.json({ success: true, message: 'Compte créé avec succès.' });
+        }
 
         if (url.includes('/users') && method === 'GET') {
             const users = db.prepare('SELECT id, nom, email, role FROM users').all();
