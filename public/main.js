@@ -2,7 +2,7 @@
 //  SecureTask — main.js (version avec API)
 // ═══════════════════════════════════════════
 
-const API = 'https://securetask-liart.vercel.app/api';
+const API = 'https://securetask2-z6kh.vercel.app/api';
 // ─── AUTH ───
 function isLoggedIn() {
     return !!localStorage.getItem('securetask_logged');
