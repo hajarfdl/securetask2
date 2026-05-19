@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const bcrypt = require('bcryptjs');  // ← NOUVELLE LIGNE
 
 // ── Connexion Neon PostgreSQL ──
 const pool = new Pool({
@@ -6,51 +7,9 @@ const pool = new Pool({
     ssl: { rejectUnauthorized: false }
 });
 
-// ── Initialisation des tables + données de départ ──
-async function initDB() {
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            nom TEXT,
-            email TEXT UNIQUE,
-            mot_de_passe TEXT,
-            role TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    `);
-
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS taches (
-            id SERIAL PRIMARY KEY,
-            titre TEXT,
-            description TEXT,
-            priorite TEXT,
-            echeance TEXT,
-            assigne_a TEXT,
-            statut TEXT,
-            labels TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    `);
-
-    const count = await pool.query('SELECT COUNT(*) FROM users');
-    if (parseInt(count.rows[0].count) === 0) {
-        await pool.query(`
-            INSERT INTO users (nom, email, mot_de_passe, role) VALUES
-            ('Karim Alaoui', 'test@securetask.ma',  'password123', 'Lead Securite'),
-            ('Ahmad',        'ahmad@securetask.ma', 'password123', 'Ingenieur SSI'),
-            ('Sara',         'sara@securetask.ma',  'password123', 'Ingenieur SSI'),
-            ('Laila',        'laila@securetask.ma', 'password123', 'Observateur')
-        `);
-        console.log('✅ Utilisateurs initiaux créés');
-    }
-}
-
-// Initialisation unique (mise en cache entre les invocations Vercel)
-const dbReady = initDB().catch(err => console.error('❌ initDB error:', err));
+// ... (reste du code inchangé) ...
 
 module.exports = async (req, res) => {
-    // Attendre que la DB soit prête
     await dbReady;
 
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -69,7 +28,8 @@ module.exports = async (req, res) => {
             const result = await pool.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [email]);
             const user   = result.rows[0];
 
-            if (user && user.mot_de_passe === password) {
+            // ✅ NOUVELLE LIGNE : Utiliser bcrypt.compare
+            if (user && await bcrypt.compare(password, user.mot_de_passe)) {
                 return res.json({
                     success: true,
                     user: { id: user.id, nom: user.nom, email: user.email, role: user.role }
@@ -94,59 +54,17 @@ module.exports = async (req, res) => {
                 return res.status(409).json({ success: false, message: 'Cet email est déjà utilisé.' });
             }
 
+            // ✅ NOUVELLE LIGNE : Hacher le mot de passe
+            const hashedPassword = await bcrypt.hash(password, 10);
+
             await pool.query(
                 'INSERT INTO users (nom, email, mot_de_passe, role) VALUES ($1, $2, $3, $4)',
-                [nom, email, password, role]
+                [nom, email, hashedPassword, role]  // ← Utiliser hashedPassword
             );
             return res.json({ success: true, message: 'Compte créé avec succès.' });
         }
 
-        // ── GET TÂCHES ──
-        if (url.includes('/taches') && method === 'GET' && !url.match(/\/taches\/\d+/)) {
-            const result = await pool.query('SELECT * FROM taches ORDER BY created_at DESC');
-            return res.json(result.rows);
-        }
-
-        // ── CREATE TÂCHE ──
-        if (url.includes('/taches') && method === 'POST') {
-            const { titre, description, priorite, echeance, assigneA, statut, labels } = req.body;
-            const result = await pool.query(
-                `INSERT INTO taches (titre, description, priorite, echeance, assigne_a, statut, labels)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-                [
-                    titre,
-                    description || '',
-                    priorite    || 'Moyenne',
-                    echeance    || '',
-                    assigneA    || 'Non assigne',
-                    statut      || 'A faire',
-                    (labels || []).join(', ')
-                ]
-            );
-            return res.json({ success: true, id: result.rows[0].id });
-        }
-
-        // ── UPDATE TÂCHE ──
-        if (url.match(/\/taches\/\d+/) && method === 'PUT') {
-            const id = url.split('/').pop();
-            await pool.query('UPDATE taches SET statut = $1 WHERE id = $2', [req.body.statut, id]);
-            return res.json({ success: true });
-        }
-
-        // ── DELETE TÂCHE ──
-        if (url.match(/\/taches\/\d+/) && method === 'DELETE') {
-            const id = url.split('/').pop();
-            await pool.query('DELETE FROM taches WHERE id = $1', [id]);
-            return res.json({ success: true });
-        }
-
-        // ── GET USERS ──
-        if (url.includes('/users') && method === 'GET') {
-            const result = await pool.query('SELECT id, nom, email, role FROM users');
-            return res.json(result.rows);
-        }
-
-        return res.status(404).json({ error: 'Route non trouvée' });
+        // ... (reste du code inchangé) ...
 
     } catch (error) {
         console.error('API Error:', error);
