@@ -74,14 +74,28 @@ function initRegister() {
         const nom      = document.getElementById('nom').value.trim();
         const email    = document.getElementById('email').value.trim();
         const password = document.getElementById('password').value;
-        const confirm  = document.getElementById('confirm-password').value;
+        const confirm     = document.getElementById('confirm-password').value;
+        const role        = document.getElementById('role').value.trim();
+        const codeAcces   = document.getElementById('code-acces').value.trim().toUpperCase();   
 
         const errEl = document.getElementById('register-error');
         const sucEl = document.getElementById('register-success');
 
         errEl.style.display = 'none';
         sucEl.style.display = 'none';
-
+        
+        // Vérification code d'accès
+        if (codeAcces !== 'AABB-AABB-1234') {
+            errEl.style.display = 'block';
+            errEl.textContent = 'Code d\'accès invalide.';
+            return;
+        }
+        // Vérification rôle
+        if (!role) {
+            errEl.style.display = 'block';
+            errEl.textContent = 'Veuillez sélectionner un rôle.';
+            return;
+        }
         // Vérification mot de passe
         if (password !== confirm) {
             errEl.style.display = 'block';
@@ -105,7 +119,8 @@ function initRegister() {
                 body: JSON.stringify({
                     nom,
                     email,
-                    password
+                    password,
+                    role
                 })
             });
 

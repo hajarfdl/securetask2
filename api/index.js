@@ -66,7 +66,7 @@ module.exports = async (req, res) => {
         // ── LOGIN ──
         if (url.includes('/login') && method === 'POST') {
             const { email, password } = req.body;
-            const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+            const result = await pool.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [email]);
             const user   = result.rows[0];
 
             if (user && user.mot_de_passe === password) {
@@ -80,23 +80,23 @@ module.exports = async (req, res) => {
 
         // ── REGISTER ──
         if (url.includes('/register') && method === 'POST') {
-            const { nom, email, password } = req.body;
+            const { nom, email, password, role } = req.body;
 
-            if (!nom || !email || !password) {
+            if (!nom || !email || !password || !role) {
                 return res.status(400).json({ success: false, message: 'Tous les champs sont obligatoires.' });
             }
             if (password.length < 6) {
                 return res.status(400).json({ success: false, message: 'Mot de passe trop court (6 caractères min).' });
             }
 
-            const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+            const existing = await pool.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [email]);
             if (existing.rows.length > 0) {
                 return res.status(409).json({ success: false, message: 'Cet email est déjà utilisé.' });
             }
 
             await pool.query(
                 'INSERT INTO users (nom, email, mot_de_passe, role) VALUES ($1, $2, $3, $4)',
-                [nom, email, password, 'Utilisateur']
+                [nom, email, password, role]
             );
             return res.json({ success: true, message: 'Compte créé avec succès.' });
         }

@@ -102,7 +102,37 @@
           required
         >
       </div>
+      <div class="form-group">
+        <label class="form-label" for="role">
+          Sélectionnez votre rôle
+        </label>
+        <select
+          id="role"
+          class="form-control"
+          required
+        >
+          <option value="">-- Choisir un rôle --</option>
+          <option value="Leader">Leader</option>
+          <option value="Ingenieur SSI">Ingénieur SSI</option>
+          <option value="Observateur">Observateur</option>
+          <option value="Consultant">Consultant</option>
+          <option value="Manager">Manager</option>
+        </select>
+      </div>
 
+      <div class="form-group">
+        <label class="form-label" for="code-acces">
+          Code d'accès
+        </label>
+        <input
+          type="text"
+          id="code-acces"
+          class="form-control"
+          placeholder="XXXX-XXXX-0000"
+          maxlength="14"
+          required
+        >
+      </div>
       <button
         type="submit"
         class="btn btn-primary"
